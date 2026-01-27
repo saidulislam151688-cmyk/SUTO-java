@@ -1,0 +1,17 @@
+[ {
+  "id" : "37d1754a-239c-4902-b3d8-1eb5204d3d6d",
+  "email" : "owner@gmail.com",
+  "passwordHash" : "$2a$10$DWXJqMXHLacyCxcSjBjKa.jSMnxWMXhgKItPJ4IVBQUw/eitTtCJu",
+  "fullName" : "owner",
+  "role" : "owner",
+  "createdAt" : [ 2026, 1, 26, 23, 48, 41, 37213300 ],
+  "updatedAt" : null
+}, {
+  "id" : "a306efc9-60c8-4f04-ade1-efe6ee4cfb26",
+  "email" : "test@example.com",
+  "passwordHash" : "$2a$10$xR8Kpz2wipzBilIb7mDI/uY74DHXuhfpXIPO40DFVgL26eB3e96SG",
+  "fullName" : "Test User",
+  "role" : "passenger",
+  "createdAt" : [ 2026, 1, 27, 1, 35, 0, 363978500 ],
+  "updatedAt" : null
+} ]
