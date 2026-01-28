@@ -1,19 +1,19 @@
 package com.suto.service;
 
 import com.suto.dto.RouteResponse;
+import com.suto.exception.RouteNotFoundException;
 import com.suto.model.Edge;
 import com.suto.model.Graph;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import java.util.*;
 
-@Service
 public class PathFinderService {
 
-    @Autowired
-    private GraphService graphService;
-    // ... (rest of the file remains same, just cleaning imports)
+    private final GraphService graphService;
+
+    public PathFinderService(GraphService graphService) {
+        this.graphService = graphService;
+    }
 
     public RouteResponse findBestRoute(String originName, String destinationName) {
         Graph graph = graphService.getGraph();
@@ -21,9 +21,7 @@ public class PathFinderService {
         UUID endNode = graph.getStopId(destinationName);
 
         if (startNode == null || endNode == null) {
-            throw new RuntimeException("One or both locations not found: " +
-                    (startNode == null ? originName : "") + " " +
-                    (endNode == null ? destinationName : ""));
+            throw new RouteNotFoundException(originName, destinationName);
         }
 
         RouteResponse response = new RouteResponse();
@@ -36,17 +34,16 @@ public class PathFinderService {
         response.setDirectRoutes(directRoutes);
 
         // 2. Find Combined Routes (Transfers)
-        List<RouteResponse.CombinedRoute> combinedRoutes;
+        List<RouteResponse.CombinedRoute> combinedRoutes = findCombinedRoutes(graph, startNode, endNode);
 
         if (!directRoutes.isEmpty()) {
-            // Special Logic: If Direct Bus exists, only show Multi-modal if it uses METRO
-            // Strategy: Start -> Nearest Metro -> Metro -> Nearest Metro -> End
-            RouteResponse.CombinedRoute metroRoute = findBestMetroRoute(graph, startNode, endNode);
-            combinedRoutes = metroRoute != null ? Collections.singletonList(metroRoute) : new ArrayList<>();
-        } else {
-            // Standard Logic: Find any combined route
-            combinedRoutes = findCombinedRoutes(graph, startNode, endNode);
+            // Special Logic: If Direct routes exist, filter OUT bus-only combined routes
+            // Keep ONLY combined routes that contain METRO
+            combinedRoutes = combinedRoutes.stream()
+                    .filter(this::hasMetro) // Keep only routes with metro
+                    .collect(java.util.stream.Collectors.toList());
         }
+        // ELSE: If no direct routes, show ALL combined routes (bus-only + metro)
 
         response.setCombinedRoutes(combinedRoutes);
 
@@ -200,98 +197,157 @@ public class PathFinderService {
 
     // --- New Metro-Centric Logic ---
 
-    // Finds a combined route that MUST use Metro for the middle leg
+    /**
+     * Finds the optimal combined route that MUST use Metro for the middle leg.
+     * Strategy: Find ALL reachable metro stations from source and destination,
+     * evaluate ALL valid combinations, select the best one based on:
+     * 1. Minimum transfers
+     * 2. Minimum total stops
+     */
     private RouteResponse.CombinedRoute findBestMetroRoute(Graph graph, UUID start, UUID end) {
-        // 1. Find nearest metro station to Start
-        MetroPathSegment startToMetro = findNearestMetro(graph, start);
-        // 2. Find nearest metro station to End
-        MetroPathSegment endToMetro = findNearestMetro(graph, end);
+        // Special case: If destination itself is a metro station, find direct metro
+        // route
+        if (isMetroStation(graph, end)) {
+            // Try to find metro-only path from reachable metro station to destination
+            List<MetroPathSegment> startMetroStations = findAllReachableMetroStations(graph, start);
 
-        if (startToMetro == null || endToMetro == null) {
-            return null; // No metro access
-        }
+            RouteResponse.CombinedRoute bestRoute = null;
+            int bestTransfers = Integer.MAX_VALUE;
+            int bestTotalStops = Integer.MAX_VALUE;
 
-        UUID metroStartNode = startToMetro.metroNode;
-        UUID metroEndNode = endToMetro.metroNode;
+            for (MetroPathSegment startSegment : startMetroStations) {
+                // Try direct metro path to destination
+                List<Edge> metroPath = findMetroPath(graph, startSegment.metroNode, end);
+                if (!metroPath.isEmpty()) {
+                    List<Edge> fullPath = new ArrayList<>();
+                    fullPath.addAll(startSegment.path);
+                    fullPath.addAll(metroPath);
 
-        if (metroStartNode.equals(metroEndNode)) {
-            return null; // Start and End are closest to the SAME station, no need to take metro between
-                         // them
-        }
+                    RouteResponse.CombinedRoute candidate = convertToCombinedRoute(graph, fullPath, start);
+                    if (candidate != null) {
+                        int transfers = candidate.getTotalSteps() - 1;
+                        int totalStops = candidate.getTotalStops();
 
-        // 3. Find path between these two metro stations strictly using METRO
-        List<Edge> metroLegEdges = findMetroPath(graph, metroStartNode, metroEndNode);
-        if (metroLegEdges.isEmpty()) {
-            return null; // These two metro stations are not connected
-        }
-
-        // 4. Final Leg: MetroEnd -> End
-        List<Edge> lastLegEdges = findSimplePath(graph, metroEndNode, end);
-        // IMPORTANT: If start==end, findSimplePath returns empty list (valid).
-        // If no path found, it returns null.
-        if (lastLegEdges == null) {
-            return null;
-        }
-
-        List<Edge> fullPath = new ArrayList<>();
-        fullPath.addAll(startToMetro.path);
-        fullPath.addAll(metroLegEdges);
-        fullPath.addAll(lastLegEdges);
-
-        return convertToCombinedRoute(graph, fullPath, start);
-    }
-
-    private MetroPathSegment findNearestMetro(Graph graph, UUID startNode) {
-        // Priority Queue to prioritize paths with FEWER TRANSFERS, then FEWER STOPS
-        Comparator<PathState> comparator = Comparator
-                .comparingInt((PathState p) -> p.transfers)
-                .thenComparingInt(p -> p.path.size());
-
-        PriorityQueue<PathState> pq = new PriorityQueue<>(comparator);
-
-        // Init state
-        // We need to track 'lastTransport' to count transfers
-        // Start node has no transport yet, so transfers=0
-        pq.add(new PathState(startNode, null, new ArrayList<>(), 0));
-
-        // Visited map: NodeID -> BestTransfersCount
-        // We only revisit a node if we found a way with FEWER transfers
-        Map<UUID, Integer> visited = new HashMap<>();
-        visited.put(startNode, 0);
-
-        int limit = 20000;
-
-        while (!pq.isEmpty() && limit-- > 0) {
-            PathState current = pq.poll();
-
-            // If we found a metro station, return it immediately (since PQ ensures best)
-            if (isMetroStation(graph, current.node)) {
-                return new MetroPathSegment(current.node, current.path);
+                        if (transfers < bestTransfers ||
+                                (transfers == bestTransfers && totalStops < bestTotalStops)) {
+                            bestRoute = candidate;
+                            bestTransfers = transfers;
+                            bestTotalStops = totalStops;
+                        }
+                    }
+                }
             }
 
-            // Optimization: If current transfers > 1, stop searching for "Nearest Metro"
-            // We only want a simple feeder bus, not a complex journey just to get to metro.
-            if (current.transfers > 1)
-                continue;
+            if (bestRoute != null) {
+                return bestRoute;
+            }
+        }
 
-            for (Edge e : graph.getNeighbors(current.node)) {
-                boolean isTransfer = current.lastTransport != null && !current.lastTransport.equals(e.getBusName());
-                int newTransfers = current.transfers + (isTransfer ? 1 : 0);
+        // 1. Find ALL reachable metro stations from Start
+        List<MetroPathSegment> startMetroStations = findAllReachableMetroStations(graph, start);
 
-                // Pruning
-                if (visited.containsKey(e.getStopId()) && visited.get(e.getStopId()) <= newTransfers) {
+        // 2. Find ALL reachable metro stations from End
+        List<MetroPathSegment> endMetroStations = findAllReachableMetroStations(graph, end);
+
+        if (startMetroStations.isEmpty() || endMetroStations.isEmpty()) {
+            return null; // No metro access from one or both endpoints
+        }
+
+        // 3. Evaluate ALL combinations and find the best route
+        RouteResponse.CombinedRoute bestRoute = null;
+        int bestTransfers = Integer.MAX_VALUE;
+        int bestTotalStops = Integer.MAX_VALUE;
+
+        for (MetroPathSegment startSegment : startMetroStations) {
+            for (MetroPathSegment endSegment : endMetroStations) {
+                UUID metroStartNode = startSegment.metroNode;
+                UUID metroEndNode = endSegment.metroNode;
+
+                // Skip if same station (no metro journey needed)
+                if (metroStartNode.equals(metroEndNode)) {
                     continue;
                 }
 
-                visited.put(e.getStopId(), newTransfers);
+                // Find metro path between these two stations
+                List<Edge> metroLegEdges = findMetroPath(graph, metroStartNode, metroEndNode);
+                if (metroLegEdges.isEmpty()) {
+                    continue; // These stations are not connected via metro
+                }
 
-                List<Edge> newPath = new ArrayList<>(current.path);
-                newPath.add(e);
+                // Find path from metro end station to final destination
+                List<Edge> lastLegEdges = findSimplePath(graph, metroEndNode, end);
+                if (lastLegEdges == null) {
+                    continue; // No path from metro station to destination
+                }
 
-                pq.add(new PathState(e.getStopId(), e.getBusName(), newPath, newTransfers));
+                // Construct complete path
+                List<Edge> fullPath = new ArrayList<>();
+                fullPath.addAll(startSegment.path);
+                fullPath.addAll(metroLegEdges);
+                fullPath.addAll(lastLegEdges);
+
+                // Convert to CombinedRoute and evaluate
+                RouteResponse.CombinedRoute candidate = convertToCombinedRoute(graph, fullPath, start);
+                if (candidate != null) {
+                    int transfers = candidate.getTotalSteps() - 1; // Number of legs - 1 = transfers
+                    int totalStops = candidate.getTotalStops();
+
+                    // Select route with minimum transfers, then minimum stops
+                    if (transfers < bestTransfers ||
+                            (transfers == bestTransfers && totalStops < bestTotalStops)) {
+                        bestRoute = candidate;
+                        bestTransfers = transfers;
+                        bestTotalStops = totalStops;
+                    }
+                }
             }
         }
-        return null;
+
+        return bestRoute;
+    }
+
+    /**
+     * Finds ALL reachable metro stations from a given starting node.
+     * Returns a list of MetroPathSegment, each containing the metro station
+     * and the path to reach it.
+     */
+    private List<MetroPathSegment> findAllReachableMetroStations(Graph graph, UUID startNode) {
+        List<MetroPathSegment> metroStations = new ArrayList<>();
+
+        // Special case: If start node is already a metro station, add it with empty
+        // path
+        if (isMetroStation(graph, startNode)) {
+            metroStations.add(new MetroPathSegment(startNode, new ArrayList<>()));
+        }
+
+        Queue<PathState> q = new LinkedList<>();
+        q.add(new PathState(startNode, new ArrayList<>()));
+        Set<UUID> visited = new HashSet<>();
+        visited.add(startNode);
+
+        int limit = 50000; // Increased to ensure we find all reachable stations
+
+        while (!q.isEmpty() && limit-- > 0) {
+            PathState current = q.poll();
+
+            // Check if current node is a metro station (but not the start node)
+            if (!current.node.equals(startNode) && isMetroStation(graph, current.node)) {
+                metroStations.add(new MetroPathSegment(current.node, current.path));
+                // Continue exploring to find more metro stations
+            }
+
+            // Explore neighbors
+            for (Edge e : graph.getNeighbors(current.node)) {
+                if (!visited.contains(e.getStopId())) {
+                    visited.add(e.getStopId());
+                    List<Edge> newPath = new ArrayList<>(current.path);
+                    newPath.add(e);
+                    q.add(new PathState(e.getStopId(), newPath));
+                }
+            }
+        }
+
+        return metroStations;
     }
 
     private boolean isMetroStation(Graph graph, UUID nodeId) {
@@ -348,38 +404,6 @@ public class PathFinderService {
             }
         }
         return Collections.emptyList();
-    }
-
-    private List<Edge> reversePath(Graph graph, List<Edge> originalPath) {
-        List<Edge> reversed = new ArrayList<>();
-        // original: A->B, B->C
-        // needed: C->B, B->A
-
-        // We need to find the reverse edge in the graph for each step
-        // Iterate backwards
-        for (int i = originalPath.size() - 1; i >= 0; i--) {
-            Edge fwd = originalPath.get(i);
-            // fwd goes from U to V. We need edge from V to U with same transport properties
-            // ideally
-            // or just any edge if we are walking/bus.
-            // Actually, "Bikalpa" A->B might be "Bikalpa" B->A.
-            UUID u = getSourceNodeOfEdge(graph, fwd); // Complex because Edge doesn't store source
-            // Wait, we can track source from previous iteration or index.
-
-            // Optimization: Re-run BFS/Pathfind from MetroEnd to Destination?
-            // "endToMetro" found path End -> Metro.
-            // We need path Metro -> End.
-            // Since graph is undirected (bidirectional edges exist), we can just find edge
-            // V->U.
-            // But we don't know U easily from Edge object alone unless we tracked it.
-            // Easier approach: Re-calculate path from MetroEnd to Destination using BFS.
-        }
-        // Fallback: Just re-calculate path simple BFS
-        // We know start and end points of this segment.
-        // Actually, let's change `findNearestMetro` to return just the MetroNode, and
-        // then we calculate path Start->Metro.
-        // And for the end leg, we calculate Metro->End.
-        return new ArrayList<>(); // Placeholder, will fix in logic
     }
 
     // Better structure classes

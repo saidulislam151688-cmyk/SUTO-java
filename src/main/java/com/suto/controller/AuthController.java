@@ -1,45 +1,57 @@
 package com.suto.controller;
 
+import com.suto.base.BaseController;
+import com.suto.dto.AuthResponse;
 import com.suto.dto.LoginRequest;
 import com.suto.dto.SignupRequest;
 import com.suto.service.AuthService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import com.sun.net.httpserver.HttpExchange;
 
-@RestController
-@RequestMapping("/api/auth")
-@CrossOrigin(origins = "*") // Allow React app to access
-public class AuthController {
+import java.io.*;
 
-    @Autowired
-    private AuthService authService;
+/**
+ * Authentication Controller - Demonstrates Inheritance
+ * Extends BaseController to inherit common HTTP handling methods
+ */
+public class AuthController extends BaseController {
 
-    @PostMapping("/signup")
-    public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
+    private final AuthService authService;
+
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
+
+    public void handleSignup(HttpExchange exchange) throws IOException {
         try {
-            return ResponseEntity.ok(authService.signup(request));
+            String body = readRequestBody(exchange);
+            SignupRequest request = objectMapper.readValue(body, SignupRequest.class);
+
+            AuthResponse response = authService.signup(request);
+            sendJsonResponse(exchange, 200, response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            sendErrorResponse(exchange, 400, e.getMessage());
         }
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public void handleLogin(HttpExchange exchange) throws IOException {
         try {
-            return ResponseEntity.ok(authService.login(request));
+            String body = readRequestBody(exchange);
+            LoginRequest request = objectMapper.readValue(body, LoginRequest.class);
+
+            AuthResponse response = authService.login(request);
+            sendJsonResponse(exchange, 200, response);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(401).body(e.getMessage());
+            sendErrorResponse(exchange, 401, e.getMessage());
         }
     }
 
-    // Helper endpoint for frontend to check role/profile
-    @GetMapping("/profile")
-    public ResponseEntity<?> getProfile(@RequestHeader("Authorization") String token) {
+    public void handleGetProfile(HttpExchange exchange) throws IOException {
         try {
-            return ResponseEntity.ok(authService.getUserProfile(token));
+            String token = exchange.getRequestHeaders().getFirst("Authorization");
+            Object profile = authService.getUserProfile(token);
+            sendJsonResponse(exchange, 200, profile);
         } catch (Exception e) {
-            return ResponseEntity.status(401).body("Invalid Token");
+            sendErrorResponse(exchange, 401, "Invalid Token");
         }
     }
 }

@@ -24,7 +24,7 @@ interface AuthResponse {
 }
 
 interface RouteRequest {
-    origin: string;
+    source: string;      // Changed from origin to match backend
     destination: string;
 }
 

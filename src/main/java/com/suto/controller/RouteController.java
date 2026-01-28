@@ -1,37 +1,45 @@
 package com.suto.controller;
 
+import com.suto.base.BaseController;
 import com.suto.dto.RouteRequest;
 import com.suto.dto.RouteResponse;
 import com.suto.service.PathFinderService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import com.sun.net.httpserver.HttpExchange;
 
-@RestController
-@RequestMapping("/api/routes")
-@CrossOrigin(origins = "*") // Allow frontend access
-public class RouteController {
+import java.io.*;
 
-    @Autowired
-    private PathFinderService pathFinderService;
+/**
+ * Route Controller - Demonstrates Inheritance
+ * Extends BaseController to inherit common HTTP handling methods
+ */
+public class RouteController extends BaseController {
 
-    @PostMapping("/find")
-    public ResponseEntity<?> findRoute(@RequestBody RouteRequest request) {
+    private final PathFinderService pathFinderService;
+
+    public RouteController(PathFinderService pathFinderService) {
+        this.pathFinderService = pathFinderService;
+    }
+
+    public void handleFindRoute(HttpExchange exchange) throws IOException {
         try {
-            if (request.getOrigin() == null || request.getDestination() == null) {
-                return ResponseEntity.badRequest().body("Origin and Destination are required");
+            String body = readRequestBody(exchange);
+            RouteRequest request = objectMapper.readValue(body, RouteRequest.class);
+
+            if (request.getSource() == null || request.getDestination() == null) {
+                sendErrorResponse(exchange, 400, "Origin and Destination are required");
+                return;
             }
 
             RouteResponse response = pathFinderService.findBestRoute(
-                    request.getOrigin().trim(),
-                    request.getDestination().trim());
+                    request.getSource(),
+                    request.getDestination());
 
-            return ResponseEntity.ok(response);
+            sendJsonResponse(exchange, 200, response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            sendErrorResponse(exchange, 400, e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body("Internal Server Error: " + e.getMessage());
+            sendErrorResponse(exchange, 500, "Internal Server Error: " + e.getMessage());
         }
     }
 }

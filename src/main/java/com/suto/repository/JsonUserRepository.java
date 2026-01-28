@@ -3,9 +3,6 @@ package com.suto.repository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.suto.model.User;
 import com.suto.util.JsonFileService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,14 +10,20 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@Repository
-@Primary
 public class JsonUserRepository implements UserRepository {
 
     private static final String USERS_FILE = "users.json";
+    private final JsonFileService jsonFileService;
 
-    @Autowired
-    private JsonFileService jsonFileService;
+    // Constructor with dependency injection
+    public JsonUserRepository(JsonFileService jsonFileService) {
+        this.jsonFileService = jsonFileService;
+    }
+
+    // Default constructor for backward compatibility
+    public JsonUserRepository() {
+        this.jsonFileService = new JsonFileService();
+    }
 
     @Override
     public Optional<User> findByEmail(String email) {

@@ -3,36 +3,36 @@ package com.suto.service;
 import com.suto.dto.AuthResponse;
 import com.suto.dto.LoginRequest;
 import com.suto.dto.SignupRequest;
+import com.suto.exception.DuplicateEmailException;
+import com.suto.exception.InvalidCredentialsException;
+import com.suto.exception.UserNotFoundException;
 import com.suto.model.User;
 import com.suto.repository.UserRepository;
 import com.suto.security.JwtUtil;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.UUID;
 
-@Service
 public class AuthService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final BCryptPasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private JwtUtil jwtUtil;
+    public AuthService(UserRepository userRepository, JwtUtil jwtUtil) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = new BCryptPasswordEncoder();
+        this.jwtUtil = jwtUtil;
+    }
 
     public AuthResponse signup(SignupRequest request) {
         // Check if email exists
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already exists");
+            throw new DuplicateEmailException(request.getEmail());
         }
 
         User user = new User();
-        user.setId(UUID.randomUUID()); // Generate our own ID since we detached from auth.users (or managing it
-                                       // ourselves)
+        // ID generation is handled by repository if null
         user.setEmail(request.getEmail());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getFullName());
@@ -49,10 +49,10 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(request.getEmail()));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Invalid credentials");
+            throw new InvalidCredentialsException();
         }
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole(), user.getId().toString());
@@ -63,6 +63,6 @@ public class AuthService {
         String userIdStr = jwtUtil.extractClaim(token.replace("Bearer ", ""),
                 claims -> claims.get("userId", String.class));
         return userRepository.findById(UUID.fromString(userIdStr))
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User ID: " + userIdStr));
     }
 }

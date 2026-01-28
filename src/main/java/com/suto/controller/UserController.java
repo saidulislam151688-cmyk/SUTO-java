@@ -1,47 +1,30 @@
 package com.suto.controller;
 
-import com.suto.model.User;
+import com.suto.base.BaseController;
 import com.suto.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import com.sun.net.httpserver.HttpExchange;
 
-import java.util.List;
+import java.io.*;
 
-@RestController
-@RequestMapping("/api")
-@CrossOrigin(origins = "*")
-public class UserController {
+/**
+ * User Controller - Demonstrates Inheritance
+ * Extends BaseController to inherit common HTTP handling methods
+ */
+public class UserController extends BaseController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
-    @GetMapping("/drivers/owner/{ownerId}")
-    public ResponseEntity<?> getDriversByOwner(@PathVariable String ownerId) {
-        try {
-            // For now, if "me" or any ID, just return ALL drivers (as requested/implied by
-            // previous "fetch all")
-            // Or filter if we had owner-driver relationship.
-            // Previous code fetched "/api/owner/drivers" which seemingly returned all.
-            List<User> drivers = userService.getAllDrivers();
-            // Wrap in map to match frontend expectation { drivers: [] } or array?
-            // Frontend: `if (data) setDrivers(data)` (I changed it to array)
-            // But let's check my frontend change... I set `setDrivers(data)`.
-            // So returning list is fine.
-            return ResponseEntity.ok(drivers);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error fetching drivers: " + e.getMessage());
-        }
+    public UserController(UserService userService) {
+        this.userService = userService;
     }
 
-    // Placeholder for profile fetch if needed
-    @GetMapping("/profiles/{userId}")
-    public ResponseEntity<?> getProfile(@PathVariable String userId) {
+    public void handleGetProfile(HttpExchange exchange) throws IOException {
         try {
-            // Return mocked profile or fetch from DB
-            return ResponseEntity.ok(userService.getUserById(userId));
+            String token = exchange.getRequestHeaders().getFirst("Authorization");
+            Object profile = userService.getProfile(token);
+            sendJsonResponse(exchange, 200, profile);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            sendErrorResponse(exchange, 401, "Unauthorized");
         }
     }
 }

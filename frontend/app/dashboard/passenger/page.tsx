@@ -143,7 +143,7 @@ export default function PassengerDashboard() {
         try {
             // Call API with correct object structure
             const response = await apiClient.findRoute({
-                origin: fromLocation,
+                source: fromLocation,
                 destination: toLocation
             })
 
@@ -419,7 +419,7 @@ export default function PassengerDashboard() {
                                             {combinedRoutes.length > 0 && (
                                                 <div className="bg-white rounded-2xl shadow-md p-6 border-l-8 border-indigo-500">
                                                     <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                                                        🔀 Multi-modal Routes <span className="text-sm font-normal text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{combinedRoutes.length} Options</span>
+                                                        🔀 Bus✕Metro <span className="text-sm font-normal text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{combinedRoutes.length} Options</span>
                                                     </h3>
                                                     <div className="space-y-6">
                                                         {combinedRoutes.map((route: any, idx: number) => (

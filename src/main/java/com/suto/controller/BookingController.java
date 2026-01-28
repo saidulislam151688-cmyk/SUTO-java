@@ -1,64 +1,47 @@
 package com.suto.controller;
 
+import com.suto.base.BaseController;
 import com.suto.dto.BookingRequest;
 import com.suto.model.Booking;
 import com.suto.service.BookingService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import com.sun.net.httpserver.HttpExchange;
 
+import java.io.*;
 import java.util.List;
+import java.util.Map;
 
-@RestController
-@RequestMapping("/api/bookings")
-@CrossOrigin(origins = "*")
-public class BookingController {
+/**
+ * Booking Controller - Demonstrates Inheritance
+ * Extends BaseController to inherit common HTTP handling methods
+ */
+public class BookingController extends BaseController {
 
-    @Autowired
-    private BookingService bookingService;
+    private final BookingService bookingService;
 
-    @PostMapping
-    public ResponseEntity<?> createBooking(@RequestBody BookingRequest request,
-            @RequestHeader("Authorization") String token) {
+    public BookingController(BookingService bookingService) {
+        this.bookingService = bookingService;
+    }
+
+    public void handleCreateBooking(HttpExchange exchange) throws IOException {
         try {
+            String token = exchange.getRequestHeaders().getFirst("Authorization");
+            String body = readRequestBody(exchange);
+            BookingRequest request = objectMapper.readValue(body, BookingRequest.class);
+
             Booking booking = bookingService.createBooking(request, token);
-            return ResponseEntity.ok(booking);
+            sendJsonResponse(exchange, 200, booking);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error creating booking: " + e.getMessage());
+            sendErrorResponse(exchange, 500, "Error creating booking: " + e.getMessage());
         }
     }
 
-    @GetMapping
-    public ResponseEntity<?> getUserBookings(@RequestHeader("Authorization") String token) {
+    public void handleGetBookings(HttpExchange exchange) throws IOException {
         try {
+            String token = exchange.getRequestHeaders().getFirst("Authorization");
             List<Booking> bookings = bookingService.getUserBookings(token);
-            return ResponseEntity.ok(bookings);
+            sendJsonResponse(exchange, 200, bookings);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error fetching bookings: " + e.getMessage());
-        }
-    }
-
-    @GetMapping("/driver/{driverId}")
-    public ResponseEntity<?> getDriverBookings(@PathVariable String driverId) {
-        try {
-            // Logic to fetch bookings for a driver
-            // For 'me', we might need to resolve ID from token, but here we accept ID.
-            List<Booking> bookings = bookingService.getDriverBookings(driverId);
-            return ResponseEntity.ok(bookings);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error fetching driver bookings: " + e.getMessage());
-        }
-    }
-
-    @PutMapping("/{id}/status")
-    public ResponseEntity<?> updateBookingStatus(@PathVariable String id,
-            @RequestBody java.util.Map<String, String> payload) {
-        try {
-            String status = payload.get("status");
-            bookingService.updateStatus(id, status);
-            return ResponseEntity.ok("{\"message\": \"Status updated\"}");
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error updating status: " + e.getMessage());
+            sendErrorResponse(exchange, 500, "Error fetching bookings");
         }
     }
 }

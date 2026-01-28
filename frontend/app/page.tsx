@@ -70,17 +70,19 @@ export default function LoginPage() {
       const userRole = response.role
       addLog(`📋 Role: ${userRole}`)
 
-      // Verify Role Hierarchy
+      // Verify Role Hierarchy - FIXED LOGIC
       addLog('Step 2: Verifying Role Access...')
-      let allowed = false
-      if (userRole === 'owner') allowed = true
-      else if (userRole === 'driver') allowed = (role === 'driver' || role === 'passenger')
-      else if (userRole === 'passenger') allowed = (role === 'passenger')
+
+      // Owner can access everything, driver can be driver/passenger, passenger only passenger
+      const allowed =
+        userRole === 'owner' || // Owner has full access
+        (userRole === 'driver' && (role === 'driver' || role === 'passenger')) ||
+        (userRole === 'passenger' && role === 'passenger')
 
       if (!allowed) {
-        addLog(`❌ Access Denied. User Role: ${userRole}, Requested: ${role}`)
+        addLog(`❌ Access Denied. Your Role: ${userRole}, Selected: ${role}`)
         localStorage.clear()
-        throw new Error('Access Denied: Role mismatch.')
+        throw new Error(`Access Denied: You are ${userRole}, cannot access ${role} features.`)
       }
 
       addLog('✅ ALL CHECKS PASSED!')

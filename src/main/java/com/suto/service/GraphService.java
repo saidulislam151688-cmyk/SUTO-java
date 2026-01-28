@@ -1,28 +1,24 @@
 package com.suto.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.suto.model.Graph;
 import com.suto.model.Stop;
-import com.suto.model.Edge;
 import com.suto.util.JsonFileService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Service
 public class GraphService {
 
-    @Autowired
-    private JsonFileService jsonFileService;
-
+    private final JsonFileService jsonFileService;
     private Graph graph;
 
-    @PostConstruct
-    public void init() {
+    public GraphService() {
+        this.jsonFileService = new JsonFileService();
+        init();
+    }
+
+    private void init() {
         refreshGraph();
     }
 
@@ -90,15 +86,5 @@ public class GraphService {
             this.graph = newGraph; // Use empty graph if loading fails
         }
     }
-
-    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // Radius of the earth in km
-        double latDistance = Math.toRadians(lat2 - lat1);
-        double lonDistance = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                        * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
     }
 }

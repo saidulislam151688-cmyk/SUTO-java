@@ -3,22 +3,24 @@ package com.suto.service;
 import com.suto.dto.BookingRequest;
 import com.suto.model.Booking;
 import com.suto.repository.BookingRepository;
+import com.suto.repository.UserRepository;
 import com.suto.security.JwtUtil;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-@Service
 public class BookingService {
 
-    @Autowired
-    private BookingRepository bookingRepository;
+    private final BookingRepository bookingRepository;
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    public BookingService(BookingRepository bookingRepository, UserRepository userRepository, JwtUtil jwtUtil) {
+        this.bookingRepository = bookingRepository;
+        this.userRepository = userRepository;
+        this.jwtUtil = jwtUtil;
+    }
 
     public Booking createBooking(BookingRequest request, String token) {
         String userIdStr = jwtUtil.extractClaim(token.replace("Bearer ", ""),

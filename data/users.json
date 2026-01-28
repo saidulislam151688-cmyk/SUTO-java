@@ -1,17 +1,51 @@
 [ {
   "id" : "37d1754a-239c-4902-b3d8-1eb5204d3d6d",
+  "name" : "owner",
   "email" : "owner@gmail.com",
+  "password" : null,
   "passwordHash" : "$2a$10$DWXJqMXHLacyCxcSjBjKa.jSMnxWMXhgKItPJ4IVBQUw/eitTtCJu",
-  "fullName" : "owner",
   "role" : "owner",
   "createdAt" : [ 2026, 1, 26, 23, 48, 41, 37213300 ],
-  "updatedAt" : null
+  "updatedAt" : null,
+  "fullName" : "owner"
 }, {
   "id" : "a306efc9-60c8-4f04-ade1-efe6ee4cfb26",
+  "name" : "Test User",
   "email" : "test@example.com",
+  "password" : null,
   "passwordHash" : "$2a$10$xR8Kpz2wipzBilIb7mDI/uY74DHXuhfpXIPO40DFVgL26eB3e96SG",
-  "fullName" : "Test User",
   "role" : "passenger",
   "createdAt" : [ 2026, 1, 27, 1, 35, 0, 363978500 ],
-  "updatedAt" : null
+  "updatedAt" : null,
+  "fullName" : "Test User"
+}, {
+  "id" : "b722e193-fb6e-4ab9-9b9f-2e7debd0ff04",
+  "name" : "Test User",
+  "email" : "testuser_88282236@example.com",
+  "password" : null,
+  "passwordHash" : "$2a$10$iHupzDdCMGzkhg4XNuDwkeb22LWRKm82jy4HYOtWu6TIJI6v29JxS",
+  "role" : "passenger",
+  "createdAt" : [ 2026, 1, 28, 5, 14, 47, 570768700 ],
+  "updatedAt" : null,
+  "fullName" : "Test User"
+}, {
+  "id" : "328a70e7-248c-4ce7-bcba-8b3b26e1363d",
+  "name" : "Integration Test",
+  "email" : "integrationtest_1884915777@test.com",
+  "password" : null,
+  "passwordHash" : "$2a$10$co9OKpZnnMbL3fKJdUovU.u86jYZZabda4n4SmULpaXo41Td/85xm",
+  "role" : "passenger",
+  "createdAt" : [ 2026, 1, 28, 5, 22, 23, 916752900 ],
+  "updatedAt" : null,
+  "fullName" : "Integration Test"
+}, {
+  "id" : "1f939929-d89f-4756-b2f5-a83757a139d2",
+  "name" : "Bus Owner",
+  "email" : "busowner@suto.com",
+  "password" : null,
+  "passwordHash" : "$2a$10$qoDRvRAkxPSB5EM8LfoTD.2639zPIfnbm5BUjwZ04MRVDVKK7Cs/q",
+  "role" : "owner",
+  "createdAt" : [ 2026, 1, 28, 5, 31, 21, 397607100 ],
+  "updatedAt" : null,
+  "fullName" : "Bus Owner"
 } ]

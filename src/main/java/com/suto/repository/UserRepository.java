@@ -1,6 +1,5 @@
 package com.suto.repository;
 
-import org.springframework.stereotype.Repository;
 import com.suto.model.User;
 import java.util.Optional;
 import java.util.UUID;

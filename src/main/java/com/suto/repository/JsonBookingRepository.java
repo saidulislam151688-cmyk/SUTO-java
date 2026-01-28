@@ -3,23 +3,26 @@ package com.suto.repository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.suto.model.Booking;
 import com.suto.util.JsonFileService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@Repository
-@Primary
 public class JsonBookingRepository implements BookingRepository {
 
     private static final String BOOKINGS_FILE = "bookings.json";
+    private final JsonFileService jsonFileService;
 
-    @Autowired
-    private JsonFileService jsonFileService;
+    // Constructor with dependency injection
+    public JsonBookingRepository(JsonFileService jsonFileService) {
+        this.jsonFileService = jsonFileService;
+    }
+
+    // Default constructor for backward compatibility
+    public JsonBookingRepository() {
+        this.jsonFileService = new JsonFileService();
+    }
 
     @Override
     public Booking save(Booking booking) {
